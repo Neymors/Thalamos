@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>CryptoGen - Generador de Contraseñas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zxcvbn/4.4.2/zxcvbn.js"></script>
+    <link rel="shortcut icon" href="assets/favicon.ico" type="image/x-icon">
+</head>
+
+<body>
+    <main class="app-container">
+        <header>
+            <h1>CryptoGen</h1>
+            <p>Generación segura vía Web Crypto API</p>
+        </header>
+
+        <section class="display-section">
+            <div class="password-screen">
+                <input type="text" id="password-output" readonly placeholder="P4$$w0rd">
+                <button id="copy-btn" title="Copiar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="strength-meter">
+                <div id="strength-bar" class="bar"></div>
+                <span id="strength-text">Fuerza: ---</span>
+            </div>
+        </section>
+
+        <section class="controls">
+            <div class="setting">
+                <div class="label-row">
+                    <label for="length-slider">Longitud</label>
+                    <span id="length-val">16</span>
+                </div>
+                <input type="range" id="length-slider" min="8" max="64" value="16">
+            </div>
+
+            <div class="options-grid">
+                <label class="check-container">
+                    Mayúsculas
+                    <input type="checkbox" id="uppercase" checked>
+                </label>
+                <label class="check-container">
+                    Símbolos
+                    <input type="checkbox" id="symbols" checked>
+                </label>
+            </div>
+
+            <button id="generate-btn" class="primary-btn">Generar Contraseña</button>
+        </section>
+
+        <footer class="vault-actions">
+            <button id="save-local" class="secondary-btn">Guardar en Bóveda</button>
+            <button id="export-encrypted" class="secondary-btn">Exportar (.json)</button>
+        </footer>
+
+        <section id="vault-list-container" class="vault-list">
+            <div class="vault-header">
+                <h3>Contraseñas Guardadas</h3>
+                <button id="clear-vault" class="text-btn">Limpiar todo</button>
+            </div>
+            <div id="vault-items">
+                <!-- Aquí se renderizan los ítems guardados -->
+            </div>
+        </section>
+
+        <!-- Modal para guardar contraseña (sin clase hidden para que funcione) -->
+        <div id="save-modal" class="modal-overlay">
+            <div class="modal-content">
+                <h3>Guardar Contraseña</h3>
+                <p>Escribe un nombre para identificar este registro</p>
+                <input type="text" id="save-name-input" placeholder="Ej: Mi cuenta de Instagram" autocomplete="off">
+                <div class="modal-actions">
+                    <button id="cancel-save" class="secondary-btn">Cancelar</button>
+                    <button id="confirm-save" class="primary-btn">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+
+</html>
