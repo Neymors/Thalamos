@@ -28,7 +28,7 @@ No necesitas instalar nada ni configurar servidores complejos. Al ser una herram
 Clona el repositorio:
 
 Bash
-git clone https://github.com/tu-usuario/cryptogen-vault.git
+git clone https://github.com/Neymors/CryptoGen.git
 Abre el archivo index.html en tu navegador preferido.
 
 ¡Listo! Crea tu cuenta maestra local y empieza a generar claves.
