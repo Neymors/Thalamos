@@ -4,7 +4,7 @@ import { generatePassword, checkStrength } from "./crypto/crypto-core.js";
 import { authService } from "./auth/auth-service.js";
 import { dbManager } from "./database/db-manager.js";
 
-// ==================== ELEMENTOS DOM ====================
+// Elementos DOM
 const authScreen = document.getElementById('auth-screen');
 const mainAppContent = document.getElementById('main-app-content');
 const loginForm = document.getElementById('login-form');
@@ -35,7 +35,7 @@ const saveUser = document.getElementById('save-user');
 const savePass = document.getElementById('save-pass');
 const vaultItems = document.getElementById('vault-items');
 
-// ==================== UTILIDADES ====================
+// Utilidades
 function showAlert(msg, isError = true) {
     alert(msg);
 }
@@ -252,32 +252,43 @@ async function renderVault() {
     });
 
     // Eventos para eliminar credencial
+    // Eventos para eliminar credencial
     document.querySelectorAll('.delete-vault-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const id = parseInt(btn.getAttribute('data-id'));
-            if (confirm("¿Eliminar esta credencial permanentemente?")) {
-                await dbManager.deleteCredential(id);
-                renderVault();
-            }
+            
+            // Se elimina directamente sin preguntar
+            await dbManager.deleteCredential(id);
+            renderVault();
         });
     });
 }
+// Modal Guardar 
+// Botón para añadir contraseña antigua (Manual)
+const addManualBtn = document.getElementById('add-manual-btn'); // Asegurate de capturarlo arriba
 
-// ==================== MODAL GUARDAR ====================
+addManualBtn.addEventListener('click', () => {
+    saveService.value = '';
+    saveUser.value = '';
+    savePass.value = '';
+    savePass.readOnly = false; // Habilitamos la escritura manual
+    document.getElementById('modal-title').textContent = '📝 Añadir Manual';
+    saveModal.classList.add('active');
+});
+
+// Botón para guardar la que acabamos de generar (Automático)
 saveLocalBtn.addEventListener('click', () => {
     const currentPass = passwordOutput.value;
     if (!currentPass) {
         return showAlert("Primero generá una contraseña.");
     }
     savePass.value = currentPass;
+    savePass.readOnly = true; // Bloqueamos para que no se modifique por error
     saveService.value = '';
     saveUser.value = '';
+    document.getElementById('modal-title').textContent = '📝 Nueva Credencial';
     saveModal.classList.add('active');
-});
-
-cancelSaveBtn.addEventListener('click', () => {
-    saveModal.classList.remove('active');
 });
 
 confirmSaveBtn.addEventListener('click', async () => {
@@ -301,7 +312,7 @@ confirmSaveBtn.addEventListener('click', async () => {
     await dbManager.saveCredential(entry);
     saveModal.classList.remove('active');
     renderVault();
-    showAlert("✅ Credencial guardada correctamente.", false);
+    //showAlert("✅ Credencial guardada correctamente.", false);
 });
 
 // Cerrar modal haciendo clic fuera
@@ -309,7 +320,9 @@ saveModal.addEventListener('click', (e) => {
     if (e.target === saveModal) saveModal.classList.remove('active');
 });
 
-// ==================== INICIALIZACIÓN ====================
+
+
+// Inicialización
 if (sessionStorage.getItem("is_auth") === "true") {
     sessionStorage.clear();
 }
