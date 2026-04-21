@@ -424,6 +424,30 @@ input[type="range"]::-moz-range-thumb {
 .vault-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 10px; }
 .vault-grid::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
 
+.vault-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.tertiary-btn {
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px dashed var(--primary);
+    color: var(--primary-glow);
+    padding: 0.4rem 0.8rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.tertiary-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-style: solid;
+}
+
 /* ==================== MODAL ==================== */
 .modal-overlay {
     position: fixed;
@@ -458,6 +482,7 @@ input[type="range"]::-moz-range-thumb {
 .modal-actions button { flex: 1; }
 .modal-actions .primary-btn { margin-top: 0; padding: 0.75rem; }
 .modal-actions .secondary-btn { padding: 0.75rem; }
+
 
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 520px) {
