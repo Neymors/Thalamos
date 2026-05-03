@@ -333,6 +333,52 @@ saveModal.addEventListener('click', (e) => {
 
 cancelSaveBtn.addEventListener('click', () => saveModal.classList.remove('active'));
 
+import { backupManager } from "./database/backup-manager.js";
+
+// ==================== BACKUP MULTI-DISPOSITIVO ====================
+const exportBtn = document.getElementById('export-btn');
+const importBtn = document.getElementById('import-btn');
+const importFileInput = document.getElementById('import-file-input');
+
+exportBtn?.addEventListener('click', async () => {
+  const pass = prompt("🔐 Ingresá tu contraseña maestra para cifrar el backup:");
+  if (!pass) return;
+  
+  try {
+    await backupManager.exportVault(pass);
+    showToast("Backup exportado correctamente. Guardalo en un lugar seguro.", 'success');
+  } catch (err) {
+    showToast("Error al exportar: " + err.message, 'error');
+  }
+});
+
+importBtn?.addEventListener('click', () => importFileInput?.click());
+
+importFileInput?.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const pass = prompt("🔐 Ingresá tu contraseña maestra para desencriptar el backup:");
+  if (!pass) { e.target.value = ''; return; }
+
+  try {
+    const result = await backupManager.importVault(file, pass);
+    showToast("Backup restaurado correctamente.", 'success');
+    
+    // Si el usuario del backup es distinto al de la sesión actual, recargamos para inicializar la clave correcta
+    if (result.user !== sessionStorage.getItem("current_user")) {
+      sessionStorage.setItem("current_user", result.user);
+      window.location.reload();
+    } else {
+      renderVault();
+    }
+  } catch (err) {
+    showToast("Error al importar: " + err.message, 'error');
+  } finally {
+    e.target.value = ''; // Resetear input para permitir reimportar el mismo archivo
+  }
+});
+
 // ==================== INIT ====================
 if (sessionStorage.getItem("is_auth") === "true") {
   sessionStorage.clear();
