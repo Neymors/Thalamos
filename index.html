@@ -12,7 +12,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/zxcvbn/4.4.2/zxcvbn.js"></script>
     <link rel="icon" href="assets/Thalamos.png" type="image/png">
     <link rel="shortcut icon" href="assets/Thalamos.ico" type="image/x-icon">
-
 </head>
 
 <body>
@@ -23,7 +22,6 @@
             <h1>Thálamos<span class="accent"></span></h1>
             <p class="subtitle">Almacenamiento cifrado · Solo en tu dispositivo</p>
         </header>
-
 
         <!-- FORMULARIO DE LOGIN -->
         <div id="login-form" class="auth-form">
@@ -133,6 +131,21 @@
             <div class="modal-actions">
                 <button id="cancel-save" class="secondary-btn">Cancelar</button>
                 <button id="confirm-save" class="primary-btn">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PARA CONTRASEÑA DE BACKUP -->
+    <div id="backup-modal" class="modal-overlay">
+        <div class="modal-card" role="dialog" aria-labelledby="backup-modal-title">
+            <h3 id="backup-modal-title">🔐 Contraseña Maestra</h3>
+            <p id="backup-modal-desc" style="font-size:12px; color:var(--text2); font-family:var(--font-mono); margin-bottom:1rem; text-align:center;"></p>
+            <div class="modal-fields">
+                <input type="password" id="backup-pass-input" placeholder="Contraseña maestra" autocomplete="current-password">
+            </div>
+            <div class="modal-actions">
+                <button id="backup-cancel-btn" class="secondary-btn">Cancelar</button>
+                <button id="backup-confirm-btn" class="primary-btn">Confirmar</button>
             </div>
         </div>
     </div>

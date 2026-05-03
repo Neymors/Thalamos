@@ -134,6 +134,52 @@ function updateStrengthMeter(password) {
   strengthText.textContent = ` Fuerza: ${label} (${result.isStrong ? '✅ segura' : '⚠️ mejorable'})`;
 }
 
+// ==================== MODAL DE CONTRASEÑA PARA BACKUP ====================
+// Reemplaza prompt() que está bloqueado en producción (iframes, headers CSP, etc.)
+function askBackupPassword(description) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('backup-modal');
+    const input = document.getElementById('backup-pass-input');
+    const desc = document.getElementById('backup-modal-desc');
+
+    desc.textContent = description;
+    input.value = '';
+    modal.classList.add('active');
+    setTimeout(() => input.focus(), 100);
+
+    // Clonar botones para eliminar listeners anteriores (evita acumulación)
+    const oldConfirm = document.getElementById('backup-confirm-btn');
+    const oldCancel = document.getElementById('backup-cancel-btn');
+    const confirmBtn = oldConfirm.cloneNode(true);
+    const cancelBtn = oldCancel.cloneNode(true);
+    oldConfirm.replaceWith(confirmBtn);
+    oldCancel.replaceWith(cancelBtn);
+
+    const cleanup = (value) => {
+      modal.classList.remove('active');
+      input.removeEventListener('keydown', keyHandler);
+      resolve(value);
+    };
+
+    confirmBtn.addEventListener('click', () => cleanup(input.value || null));
+    cancelBtn.addEventListener('click', () => cleanup(null));
+
+    const keyHandler = (e) => {
+      if (e.key === 'Enter') cleanup(input.value || null);
+      if (e.key === 'Escape') cleanup(null);
+    };
+    input.addEventListener('keydown', keyHandler);
+
+    // Click fuera del modal también cancela
+    modal.addEventListener('click', function outsideClick(e) {
+      if (e.target === modal) {
+        modal.removeEventListener('click', outsideClick);
+        cleanup(null);
+      }
+    });
+  });
+}
+
 // ==================== NAVEGACIÓN AUTH ====================
 goToRegister.addEventListener('click', () => {
   loginForm.classList.add('hidden');
@@ -341,7 +387,8 @@ const importBtn = document.getElementById('import-btn');
 const importFileInput = document.getElementById('import-file-input');
 
 exportBtn?.addEventListener('click', async () => {
-  const pass = prompt("🔐 Ingresá tu contraseña maestra para cifrar el backup:");
+  // Usamos modal propio en lugar de prompt() (bloqueado en producción)
+  const pass = await askBackupPassword("Ingresá tu contraseña maestra para cifrar el backup.");
   if (!pass) return;
   
   try {
@@ -358,7 +405,8 @@ importFileInput?.addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   
-  const pass = prompt("🔐 Ingresá tu contraseña maestra para desencriptar el backup:");
+  // Usamos modal propio en lugar de prompt() (bloqueado en producción)
+  const pass = await askBackupPassword("Ingresá tu contraseña maestra para desencriptar el backup.");
   if (!pass) { e.target.value = ''; return; }
 
   try {
