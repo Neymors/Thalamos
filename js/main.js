@@ -1,48 +1,7 @@
-// main.js - Versión definitiva con Toast Notifications y sin errores de sintaxis
+// main.js - Versión segura con Toasts y cifrado integrado
 import { generatePassword, checkStrength } from "./crypto/crypto-core.js";
 import { authService } from "./auth/auth-service.js";
 import { dbManager } from "./database/db-manager.js";
-
-// ==================== SISTEMA DE NOTIFICACIONES ====================
-function showToast(message, type = 'info', duration = 4000) {
-  let container = document.querySelector('.toast-container');
-  if (!container) {
-    container = document.createElement('div');
-    container.className = 'toast-container';
-    document.body.appendChild(container);
-  }
-
-  const icons = {
-    success: '✅',
-    error: '❌',
-    warning: '️',
-    info: 'ℹ️'
-  };
-
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `
-    <span class="toast-icon">${icons[type] || icons.info}</span>
-    <span class="toast-content">${message}</span>
-    <button class="toast-close" aria-label="Cerrar">×</button>
-  `;
-
-  container.appendChild(toast);
-
-  // Cerrar manualmente
-  toast.querySelector('.toast-close').addEventListener('click', () => {
-    toast.style.animation = 'toastSlideOut 0.3s ease forwards';
-    setTimeout(() => toast.remove(), 300);
-  });
-
-  // Auto-cierre
-  setTimeout(() => {
-    if (toast.parentElement) {
-      toast.style.animation = 'toastSlideOut 0.3s ease forwards';
-      setTimeout(() => toast.remove(), 300);
-    }
-  }, duration);
-}
 
 // ==================== ELEMENTOS DOM ====================
 const authScreen = document.getElementById('auth-screen');
@@ -56,7 +15,6 @@ const registerBtn = document.getElementById('register-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const currentUserDisplay = document.getElementById('current-user-display');
 
-// Generador
 const lengthSlider = document.getElementById('length-slider');
 const lengthVal = document.getElementById('length-val');
 const passwordOutput = document.getElementById('password-output');
@@ -65,7 +23,6 @@ const copyBtn = document.getElementById('copy-btn');
 const strengthBar = document.getElementById('strength-bar');
 const strengthText = document.getElementById('strength-text');
 
-// Bóveda y modal
 const saveLocalBtn = document.getElementById('save-local');
 const addManualBtn = document.getElementById('add-manual-btn');
 const saveModal = document.getElementById('save-modal');
@@ -76,10 +33,43 @@ const saveUser = document.getElementById('save-user');
 const savePass = document.getElementById('save-pass');
 const vaultItems = document.getElementById('vault-items');
 
+// ==================== SISTEMA DE NOTIFICACIONES (TOASTS) ====================
+function showToast(message, type = 'info', duration = 4000) {
+  let container = document.querySelector('.toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || icons.info}</span>
+    <span class="toast-content">${message}</span>
+    <button class="toast-close" aria-label="Cerrar">×</button>
+  `;
+
+  container.appendChild(toast);
+
+  toast.querySelector('.toast-close').addEventListener('click', () => {
+    toast.style.animation = 'toastSlideOut 0.3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  });
+
+  setTimeout(() => {
+    if (toast.parentElement) {
+      toast.style.animation = 'toastSlideOut 0.3s ease forwards';
+      setTimeout(() => toast.remove(), 300);
+    }
+  }, duration);
+}
+
 // ==================== UTILIDADES ====================
 function escapeHtml(str) {
   if (!str) return '';
-  return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m] || m));
+  return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m] || m));
 }
 
 async function copyToClipboard(text, buttonElement, successMessage = "✅ Copiado") {
@@ -101,7 +91,6 @@ async function copyToClipboard(text, buttonElement, successMessage = "✅ Copiad
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
-      textArea.setSelectionRange(0, 99999);
       const successful = document.execCommand('copy');
       document.body.removeChild(textArea);
       
@@ -124,14 +113,13 @@ function updateStrengthMeter(password) {
   if (!password) {
     strengthBar.style.width = '0%';
     strengthBar.className = 'bar';
-    strengthText.textContent = ' Fuerza: ---';
+    strengthText.textContent = '⚡ Fuerza: ---';
     return;
   }
   const result = checkStrength(password);
   const score = result.score;
   let width = (score + 1) * 20;
-  let color = '';
-  let label = '';
+  let color = '', label = '';
   switch (score) {
     case 0: color = '#ef4444'; label = 'Muy débil'; break;
     case 1: color = '#f97316'; label = 'Débil'; break;
@@ -162,7 +150,7 @@ goToLogin.addEventListener('click', () => {
   document.getElementById('reg-pass-confirm').value = '';
 });
 
-// ==================== LOGIN & REGISTRO ====================
+// ==================== AUTENTICACIÓN (CON CIFRADO) ====================
 loginBtn.addEventListener('click', async () => {
   const user = document.getElementById('login-user').value.trim();
   const pass = document.getElementById('login-pass').value;
@@ -170,11 +158,19 @@ loginBtn.addEventListener('click', async () => {
 
   const success = await authService.login(user, pass);
   if (success) {
-    authScreen.classList.add('hidden');
-    mainAppContent.classList.remove('hidden');
-    if (currentUserDisplay) currentUserDisplay.textContent = user;
-    renderVault();
-    generateNewPassword();
+    try {
+      // 🔐 Inicializar clave de cifrado en memoria
+      await dbManager.setEncryptionKey(pass);
+      
+      authScreen.classList.add('hidden');
+      mainAppContent.classList.remove('hidden');
+      if (currentUserDisplay) currentUserDisplay.textContent = user;
+      renderVault();
+      generateNewPassword();
+    } catch (error) {
+      showToast("Error al inicializar la bóveda segura.", 'error');
+      console.error(error);
+    }
   } else {
     showToast("Usuario o contraseña incorrectos.", 'error');
   }
@@ -184,7 +180,7 @@ registerBtn.addEventListener('click', async () => {
   const user = document.getElementById('reg-user').value.trim();
   const pass = document.getElementById('reg-pass').value;
   const confirm = document.getElementById('reg-pass-confirm').value;
-
+  
   if (!user || !pass || !confirm) return showToast("Completá todos los campos.", 'warning');
   if (user.length < 3) return showToast("El usuario debe tener al menos 3 caracteres.", 'warning');
   if (pass.length < 6) return showToast("La contraseña debe tener al menos 6 caracteres.", 'warning');
@@ -202,7 +198,11 @@ registerBtn.addEventListener('click', async () => {
   }
 });
 
-logoutBtn.addEventListener('click', () => authService.logout());
+logoutBtn.addEventListener('click', () => {
+  // 🔐 Limpiar clave de memoria antes de cerrar sesión
+  dbManager.clearEncryptionKey();
+  authService.logout();
+});
 
 // ==================== GENERADOR ====================
 function generateNewPassword() {
@@ -229,53 +229,58 @@ copyBtn.addEventListener('click', () => {
   copyToClipboard(password, copyBtn, "✅ Copiado");
 });
 
-// ==================== BÓVEDA ====================
+// ==================== BÓVEDA (DESENCRIPTACIÓN AUTOMÁTICA) ====================
 async function renderVault() {
   const currentUser = sessionStorage.getItem("current_user");
   if (!currentUser) return;
-  
-  const items = await dbManager.getAll(currentUser);
-  vaultItems.innerHTML = '';
-  
-  if (items.length === 0) {
-    vaultItems.innerHTML = '<p class="empty-msg"> No hay credenciales guardadas aún.</p>';
-    return;
+
+  try {
+    const items = await dbManager.getAll(currentUser);
+    vaultItems.innerHTML = '';
+
+    if (items.length === 0) {
+      vaultItems.innerHTML = '<p class="empty-msg"> No hay credenciales guardadas aún.</p>';
+      return;
+    }
+
+    items.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'vault-item';
+      div.innerHTML = `
+        <div class="vault-info">
+          <strong>${escapeHtml(item.service)}</strong>
+          <span class="vault-user">${escapeHtml(item.user)}</span>
+        </div>
+        <div class="vault-actions-buttons">
+          <button class="copy-pass-btn" data-pass="${escapeHtml(item.pass)}">📋 Copiar</button>
+          <button class="delete-vault-btn" data-id="${item.id}">🗑️</button>
+        </div>`;
+      vaultItems.appendChild(div);
+    });
+
+    document.querySelectorAll('.copy-pass-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const pass = btn.getAttribute('data-pass');
+        if (pass) await copyToClipboard(pass, btn, "✅ Copiado");
+      });
+    });
+
+    document.querySelectorAll('.delete-vault-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = parseInt(btn.getAttribute('data-id'));
+        await dbManager.deleteCredential(id);
+        renderVault();
+      });
+    });
+  } catch (error) {
+    showToast("Error al cargar la bóveda.", 'error');
+    console.error(error);
   }
-
-  items.forEach(item => {
-    const div = document.createElement('div');
-    div.className = 'vault-item';
-    div.innerHTML = `
-      <div class="vault-info">
-        <strong>${escapeHtml(item.service)}</strong>
-        <span class="vault-user">${escapeHtml(item.user)}</span>
-      </div>
-      <div class="vault-actions-buttons">
-        <button class="copy-pass-btn" data-pass="${escapeHtml(item.pass)}">📋 Copiar</button>
-        <button class="delete-vault-btn" data-id="${item.id}">🗑️</button>
-      </div>`;
-    vaultItems.appendChild(div);
-  });
-
-  document.querySelectorAll('.copy-pass-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const pass = btn.getAttribute('data-pass');
-      if (pass) await copyToClipboard(pass, btn, "✅ Copiado");
-    });
-  });
-
-  document.querySelectorAll('.delete-vault-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const id = parseInt(btn.getAttribute('data-id'));
-      await dbManager.deleteCredential(id);
-      renderVault();
-    });
-  });
 }
 
-// ==================== MODAL GUARDAR ====================
+// ==================== MODAL GUARDAR (ENCRIPTACIÓN AUTOMÁTICA) ====================
 addManualBtn.addEventListener('click', () => {
   saveService.value = '';
   saveUser.value = '';
@@ -293,7 +298,7 @@ saveLocalBtn.addEventListener('click', () => {
   savePass.readOnly = true;
   saveService.value = '';
   saveUser.value = '';
-  document.getElementById('modal-title').textContent = '📝 Nueva Credencial';
+  document.getElementById('modal-title').textContent = ' Nueva Credencial';
   saveModal.classList.add('active');
 });
 
@@ -306,10 +311,20 @@ confirmSaveBtn.addEventListener('click', async () => {
   if (!service || !user) return showToast("Completá el servicio y el usuario.", 'warning');
   if (!pass) return showToast("No hay contraseña para guardar.", 'warning');
 
-  await dbManager.saveCredential({ id: Date.now(), userId: currentUser, service, user, pass });
-  saveModal.classList.remove('active');
-  renderVault();
-  showToast("Credencial guardada correctamente.", 'success');
+  try {
+    const entry = {
+      id: Date.now(),
+      userId: currentUser,
+      service, user, pass
+    };
+    await dbManager.saveCredential(entry);
+    saveModal.classList.remove('active');
+    renderVault();
+    showToast("Credencial guardada correctamente.", 'success');
+  } catch (error) {
+    showToast("Error al guardar la credencial.", 'error');
+    console.error(error);
+  }
 });
 
 saveModal.addEventListener('click', (e) => {
