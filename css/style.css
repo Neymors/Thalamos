@@ -430,3 +430,19 @@ input[readonly] { cursor: default; background: var(--surface2); color: var(--tex
   from { opacity: 1; transform: translateX(0) scale(1); }
   to { opacity: 0; transform: translateX(30px) scale(0.95); }
 }
+
+/* ==================== ESTADOS DE BOTONES ====================  */
+button:disabled { 
+  opacity: 0.6; 
+  cursor: not-allowed; 
+}
+
+button:disabled:hover { 
+  background-color: inherit; 
+  border-color: inherit; 
+  color: inherit;
+}
+
+.modal-overlay { 
+  transition: opacity 0.3s ease; 
+}

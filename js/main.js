@@ -1,4 +1,4 @@
-// main.js - Versión segura con Toasts y cifrado integrado
+// main.js - Versión segura con Toasts, cifrado integrado + Seguridad mejorada
 import { generatePassword, checkStrength } from "./crypto/crypto-core.js";
 import { authService } from "./auth/auth-service.js";
 import { dbManager } from "./database/db-manager.js";
@@ -32,6 +32,66 @@ const saveService = document.getElementById('save-service');
 const saveUser = document.getElementById('save-user');
 const savePass = document.getElementById('save-pass');
 const vaultItems = document.getElementById('vault-items');
+
+// ==================== SEGURIDAD: CONTROL DE INACTIVIDAD ====================
+let inactivityTimeout;
+const INACTIVITY_TIME = 10 * 60 * 1000; // 10 minutos
+
+function resetInactivityTimer() {
+  clearTimeout(inactivityTimeout);
+  inactivityTimeout = setTimeout(() => {
+    if (sessionStorage.getItem("is_auth") === "true") {
+      showToast("Sesión cerrada por inactividad.", 'warning');
+      dbManager.clearEncryptionKey();
+      authService.logout();
+    }
+  }, INACTIVITY_TIME);
+}
+
+// Detectar actividad: click, tecla, scroll
+document.addEventListener('click', resetInactivityTimer);
+document.addEventListener('keydown', resetInactivityTimer);
+document.addEventListener('scroll', resetInactivityTimer);
+document.addEventListener('mousemove', resetInactivityTimer);
+document.addEventListener('touchstart', resetInactivityTimer);
+
+// ==================== SEGURIDAD: LÍMITE DE INTENTOS DE LOGIN ====================
+const LOGIN_ATTEMPT_KEY = 'login_attempts';
+const LOGIN_LOCKOUT_DURATION = 60 * 1000; // 1 minuto
+const MAX_LOGIN_ATTEMPTS = 3;
+
+function getLoginAttempts() {
+  const stored = localStorage.getItem(LOGIN_ATTEMPT_KEY);
+  if (!stored) return { count: 0, timestamp: null, locked: false };
+  
+  const { count, timestamp } = JSON.parse(stored);
+  const now = Date.now();
+  
+  // Si pasó el tiempo de bloqueo, reiniciar
+  if (now - timestamp > LOGIN_LOCKOUT_DURATION) {
+    return { count: 0, timestamp: null, locked: false };
+  }
+  
+  return { 
+    count, 
+    timestamp, 
+    locked: count >= MAX_LOGIN_ATTEMPTS,
+    remainingTime: Math.ceil((LOGIN_LOCKOUT_DURATION - (now - timestamp)) / 1000)
+  };
+}
+
+function recordLoginAttempt() {
+  const attempts = getLoginAttempts();
+  const newCount = attempts.count + 1;
+  localStorage.setItem(LOGIN_ATTEMPT_KEY, JSON.stringify({
+    count: newCount,
+    timestamp: Date.now()
+  }));
+}
+
+function clearLoginAttempts() {
+  localStorage.removeItem(LOGIN_ATTEMPT_KEY);
+}
 
 // ==================== SISTEMA DE NOTIFICACIONES (TOASTS) ====================
 function showToast(message, type = 'info', duration = 4000) {
@@ -70,6 +130,18 @@ function showToast(message, type = 'info', duration = 4000) {
 function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m] || m));
+}
+
+// Estado de carga para botones
+function setButtonLoading(button, isLoading) {
+  if (isLoading) {
+    button.dataset.originalText = button.textContent;
+    button.textContent = '⏳ Procesando...';
+    button.disabled = true;
+  } else {
+    button.textContent = button.dataset.originalText || button.textContent;
+    button.disabled = false;
+  }
 }
 
 async function copyToClipboard(text, buttonElement, successMessage = "✅ Copiado") {
@@ -134,6 +206,47 @@ function updateStrengthMeter(password) {
   strengthText.textContent = ` Fuerza: ${label} (${result.isStrong ? '✅ segura' : '⚠️ mejorable'})`;
 }
 
+// ==================== MODAL DE CONFIRMACIÓN (para borrar) ====================
+function askConfirmation(title, message) {
+  return new Promise((resolve) => {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay active';
+    modal.innerHTML = `
+      <div class="modal-card" role="dialog">
+        <h3 style="font-size:14px; font-family:var(--font-mono); font-weight:600; margin-bottom:1rem; text-align:center; color:var(--text);">${title}</h3>
+        <p style="font-size:12px; color:var(--text2); font-family:var(--font-mono); margin-bottom:1.5rem; text-align:center;">${message}</p>
+        <div class="modal-actions">
+          <button class="secondary-btn" id="confirm-no">Cancelar</button>
+          <button class="primary-btn" id="confirm-yes" style="background:var(--error); color:white; border-color:var(--error);">Eliminar</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    const yesBtn = modal.querySelector('#confirm-yes');
+    const noBtn = modal.querySelector('#confirm-no');
+    
+    const cleanup = (result) => {
+      modal.style.opacity = '0';
+      setTimeout(() => modal.remove(), 300);
+      resolve(result);
+    };
+    
+    yesBtn.addEventListener('click', () => cleanup(true));
+    noBtn.addEventListener('click', () => cleanup(false));
+    
+    // Escape cancela
+    const keyHandler = (e) => {
+      if (e.key === 'Escape') {
+        document.removeEventListener('keydown', keyHandler);
+        cleanup(false);
+      }
+    };
+    document.addEventListener('keydown', keyHandler);
+  });
+}
+
 // ==================== MODAL DE CONTRASEÑA PARA BACKUP ====================
 // Reemplaza prompt() que está bloqueado en producción (iframes, headers CSP, etc.)
 function askBackupPassword(description) {
@@ -196,29 +309,56 @@ goToLogin.addEventListener('click', () => {
   document.getElementById('reg-pass-confirm').value = '';
 });
 
-// ==================== AUTENTICACIÓN (CON CIFRADO) ====================
+// ==================== AUTENTICACIÓN (CON CIFRADO + LÍMITE DE INTENTOS) ====================
 loginBtn.addEventListener('click', async () => {
   const user = document.getElementById('login-user').value.trim();
   const pass = document.getElementById('login-pass').value;
+  
   if (!user || !pass) return showToast("Completá ambos campos.", 'warning');
 
-  const success = await authService.login(user, pass);
-  if (success) {
-    try {
+  // Verificar límite de intentos
+  const loginAttempts = getLoginAttempts();
+  if (loginAttempts.locked) {
+    showToast(`Demasiados intentos. Intenta en ${loginAttempts.remainingTime}s.`, 'error');
+    return;
+  }
+
+  setButtonLoading(loginBtn, true);
+  
+  try {
+    const success = await authService.login(user, pass);
+    
+    if (success) {
+      clearLoginAttempts();
       // 🔐 Inicializar clave de cifrado en memoria
       await dbManager.setEncryptionKey(pass);
       
       authScreen.classList.add('hidden');
       mainAppContent.classList.remove('hidden');
       if (currentUserDisplay) currentUserDisplay.textContent = user;
+      
+      // Iniciar timer de inactividad
+      resetInactivityTimer();
+      
       renderVault();
       generateNewPassword();
-    } catch (error) {
-      showToast("Error al inicializar la bóveda segura.", 'error');
-      console.error(error);
+      showToast("¡Sesión iniciada!", 'success');
+    } else {
+      recordLoginAttempt();
+      const newAttempts = getLoginAttempts();
+      const attemptsLeft = MAX_LOGIN_ATTEMPTS - newAttempts.count;
+      
+      if (attemptsLeft > 0) {
+        showToast(`Usuario o contraseña incorrectos. (${attemptsLeft} intento${attemptsLeft > 1 ? 's' : ''} restante${attemptsLeft > 1 ? 's' : ''})`, 'error');
+      } else {
+        showToast(`Cuenta bloqueada por seguridad. Intenta nuevamente en 1 minuto.`, 'error');
+      }
     }
-  } else {
-    showToast("Usuario o contraseña incorrectos.", 'error');
+  } catch (error) {
+    showToast("Error al inicializar la bóveda segura.", 'error');
+    console.error(error);
+  } finally {
+    setButtonLoading(loginBtn, false);
   }
 });
 
@@ -232,20 +372,27 @@ registerBtn.addEventListener('click', async () => {
   if (pass.length < 6) return showToast("La contraseña debe tener al menos 6 caracteres.", 'warning');
   if (pass !== confirm) return showToast("Las contraseñas no coinciden.", 'error');
 
-  const result = await authService.register(user, pass);
-  if (result.success) {
-    showToast("¡Cuenta creada con éxito! Ahora iniciá sesión.", 'success');
-    registerForm.classList.add('hidden');
-    loginForm.classList.remove('hidden');
-    document.getElementById('login-user').value = user;
-    document.getElementById('login-pass').value = '';
-  } else {
-    showToast(result.message || "Error al crear la cuenta.", 'error');
+  setButtonLoading(registerBtn, true);
+  
+  try {
+    const result = await authService.register(user, pass);
+    if (result.success) {
+      showToast("¡Cuenta creada con éxito! Ahora iniciá sesión.", 'success');
+      registerForm.classList.add('hidden');
+      loginForm.classList.remove('hidden');
+      document.getElementById('login-user').value = user;
+      document.getElementById('login-pass').value = '';
+    } else {
+      showToast(result.message || "Error al crear la cuenta.", 'error');
+    }
+  } finally {
+    setButtonLoading(registerBtn, false);
   }
 });
 
 logoutBtn.addEventListener('click', () => {
   // 🔐 Limpiar clave de memoria antes de cerrar sesión
+  clearTimeout(inactivityTimeout);
   dbManager.clearEncryptionKey();
   authService.logout();
 });
@@ -316,8 +463,18 @@ async function renderVault() {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const id = parseInt(btn.getAttribute('data-id'));
-        await dbManager.deleteCredential(id);
-        renderVault();
+        
+        // Pedir confirmación antes de borrar
+        const confirmed = await askConfirmation(
+          '⚠️ Confirmar eliminación',
+          '¿Estás seguro de que querés borrar esta credencial? Esta acción no se puede deshacer.'
+        );
+        
+        if (confirmed) {
+          await dbManager.deleteCredential(id);
+          renderVault();
+          showToast("Credencial eliminada.", 'success');
+        }
       });
     });
   } catch (error) {
@@ -391,11 +548,14 @@ exportBtn?.addEventListener('click', async () => {
   const pass = await askBackupPassword("Ingresá tu contraseña maestra para cifrar el backup.");
   if (!pass) return;
   
+  setButtonLoading(exportBtn, true);
   try {
     await backupManager.exportVault(pass);
     showToast("Backup exportado correctamente. Guardalo en un lugar seguro.", 'success');
   } catch (err) {
     showToast("Error al exportar: " + err.message, 'error');
+  } finally {
+    setButtonLoading(exportBtn, false);
   }
 });
 
